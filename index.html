@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Market Basket Customer Segmentation Dashboard</title>
+  
+  <!-- Font and Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Libraries for Excel, Word, and Charts -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.4.21/mammoth.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg-base: #090d16;
+      --card-bg: rgba(22, 30, 49, 0.75);
+      --card-border: rgba(56, 189, 248, 0.18);
+      --accent-cyan: #38bdf8;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    
+    body {
+      background: radial-gradient(circle at top right, #132238, var(--bg-base) 65%);
+      color: var(--text-main);
+      padding: 30px;
+      min-height: 100vh;
+    }
+
+    .container { max-width: 1240px; margin: 0 auto; }
+
+    /* Header styling */
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+      position: relative;
+    }
+    .header .tag {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      border-radius: 30px;
+      display: inline-block;
+      margin-bottom: 12px;
+    }
+    .header h1 {
+      font-size: 32px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ffffff 30%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+    .header p { color: var(--text-muted); font-size: 15px; }
+
+    /* Glass Cards */
+    .glass-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Drag and Drop Box */
+    .upload-zone {
+      border: 2px dashed rgba(56, 189, 248, 0.45);
+      border-radius: 16px;
+      padding: 38px 20px;
+      text-align: center;
+      background: rgba(15, 23, 42, 0.6);
+      cursor: pointer;
+      margin-bottom: 26px;
+      transition: all 0.3s ease;
+    }
+    .upload-zone:hover {
+      border-color: var(--accent-cyan);
+      background: rgba(56, 189, 248, 0.05);
+      transform: translateY(-2px);
+    }
+    .upload-zone .icon { font-size: 42px; margin-bottom: 10px; display: block; }
+    .upload-zone h3 { font-size: 19px; color: #ffffff; font-weight: 600; margin-bottom: 6px; }
+    .upload-zone p { font-size: 13px; color: var(--text-muted); }
+    .file-input { display: none; }
+
+    /* File Metadata section */
+    .meta-box {
+      padding: 20px;
+      display: none;
+      margin-bottom: 24px;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .meta-item {
+      background: rgba(11, 15, 25, 0.6);
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .meta-item strong {
+      display: block;
+      color: var(--accent-cyan);
+      font-size: 16px;
+      margin-top: 4px;
+      font-weight: 700;
+    }
+
+    /* Control Selector Bar */
+    .column-selectors {
+      display: none;
+      padding: 20px;
+      margin-bottom: 24px;
+      gap: 20px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .selector-grp { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 220px; }
+    .selector-grp label { font-size: 13px; color: #cbd5e1; font-weight: 600; }
+    select {
+      background: #0b0f19;
+      color: white;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+    .btn-run {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 14px;
+      align-self: flex-end;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+      transition: all 0.2s ease;
+    }
+    .btn-run:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(37, 99, 235, 0.6); }
+
+    /* Data Preview Table */
+    .preview-card {
+      padding: 20px;
+      margin-bottom: 26px;
+      display: none;
+      overflow-x: auto;
+    }
+    .preview-card h3 { font-size: 16px; margin-bottom: 14px; font-weight: 700; color: #ffffff; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 10px 14px; border: 1px solid rgba(255, 255, 255, 0.08); }
+    th { background: rgba(15, 23, 42, 0.9); color: var(--accent-cyan); font-weight: 600; }
+    tr:nth-child(even) { background: rgba(255, 255, 255, 0.02); }
+
+    /* Word Document Preview */
+    .docx-box {
+      background: #0b0f19;
+      border: 1px solid var(--card-border);
+      padding: 20px;
+      border-radius: 12px;
+      max-height: 250px;
+      overflow-y: auto;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #cbd5e1;
+      display: none;
+      margin-bottom: 24px;
+    }
+
+    /* Graphs Layout */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+      margin-bottom: 28px;
+      display: none;
+    }
+    @media (max-width: 900px) { .charts-grid { grid-template-columns: 1fr; } }
+    .chart-card { padding: 22px; }
+    .chart-card h2 { font-size: 17px; margin-bottom: 6px; font-weight: 700; }
+    .chart-card p { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+    .chart-container { position: relative; height: 320px; width: 100%; }
+
+    /* Persona Insights Cards */
+    .personas-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+      margin-bottom: 26px;
+      display: none;
+    }
+    .persona-card {
+      padding: 18px;
+      border-radius: 12px;
+      border-left: 5px solid var(--accent-cyan);
+      background: rgba(15, 23, 42, 0.6);
+    }
+    .persona-card h4 { font-size: 16px; margin-bottom: 8px; font-weight: 700; }
+    .persona-card p { font-size: 13px; color: #cbd5e1; margin-bottom: 5px; }
+    .persona-badge { font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 600; display: inline-block; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <span class="tag">FDS PROJECT &bull; UNSUPERVISED ML</span>
+      <h1>Market Basket Customer Segmentation</h1>
+      <p>Analyze Supermarket Customer Spending & Frequency in Indian Rupees (₹) using K-Means and Elbow Method</p>
+    </div>
+
+    <!-- Upload Area -->
+    <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+      <input type="file" id="fileInput" class="file-input" accept=".xlsx, .xls, .csv, .docx" onchange="handleFile(event)">
+      <span class="icon">📁</span>
+      <h3>Click or Drop Dataset File Here</h3>
+      <p>Supported Formats: Excel (.xlsx, .xls), CSV (.csv), Word (.docx)</p>
+    </div>
+
+    <!-- File Meta Info Card -->
+    <div class="glass-card meta-box" id="metaCard">
+      <h3 style="font-size: 16px; color: #fff;">Dataset Overview</h3>
+      <div class="meta-grid">
+        <div class="meta-item">File Name:<strong id="metaName">-</strong></div>
+        <div class="meta-item">File Format:<strong id="metaType">-</strong></div>
+        <div class="meta-item">File Size:<strong id="metaSize">-</strong></div>
+        <div class="meta-item">Total Records:<strong id="metaRows">-</strong></div>
+      </div>
+    </div>
+
+    <!-- Word Document Preview Area -->
+    <div class="docx-box" id="docxContainer"></div>
+
+    <!-- Column Selector Bar -->
+    <div class="glass-card column-selectors" id="colSelectors">
+      <div class="selector-grp">
+        <label>Select Spending Column (₹ INR):</label>
+        <select id="spendCol"></select>
+      </div>
+      <div class="selector-grp">
+        <label>Select Frequency Column (Orders / Visits):</label>
+        <select id="freqCol"></select>
+      </div>
+      <button class="btn-run" onclick="executeSegmentation()">Run K-Means Algorithm</button>
+    </div>
+
+    <!-- Table Preview -->
+    <div class="glass-card preview-card" id="previewCard">
+      <h3>Sample Records Preview (First 5 Rows):</h3>
+      <table id="previewTable"></table>
+    </div>
+
+    <!-- Graphs Area -->
+    <div class="charts-grid" id="chartsArea">
+      <div class="glass-card chart-card">
+        <h2>Optimal K Selection (Elbow Curve)</h2>
+        <p>Within-Cluster Sum of Squares (Inertia) vs Number of Clusters</p>
+        <div class="chart-container">
+          <canvas id="elbowChart"></canvas>
+        </div>
+      </div>
+      <div class="glass-card chart-card">
+        <h2>Customer Segments (K = 3 Groups)</h2>
+        <p>Segmentation based on Annual Spend (₹) vs Purchase Frequency</p>
+        <div class="chart-container">
+          <canvas id="scatterChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Personas Insights -->
+    <div class="personas-grid" id="personasArea"></div>
+  </div>
+
+  <script>
+    let rawData = [];
+    let elbowChartInstance = null;
+    let scatterChartInstance = null;
+
+    function handleFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const fileName = file.name;
+      const fileExt = fileName.split('.').pop().toLowerCase();
+      const fileSize = (file.size / 1024).toFixed(2) + ' KB';
+
+      document.getElementById('metaName').innerText = fileName;
+      document.getElementById('metaType').innerText = fileExt.toUpperCase();
+      document.getElementById('metaSize').innerText = fileSize;
+      document.getElementById('metaCard').style.display = 'block';
+
+      // Reset previous views
+      document.getElementById('docxContainer').style.display = 'none';
+      document.getElementById('colSelectors').style.display = 'none';
+      document.getElementById('previewCard').style.display = 'none';
+      document.getElementById('chartsArea').style.display = 'none';
+      document.getElementById('personasArea').style.display = 'none';
+
+      if (fileExt === 'docx') {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          mammoth.convertToHtml({ arrayBuffer: e.target.result })
+            .then(result => {
+              const docxBox = document.getElementById('docxContainer');
+              docxBox.innerHTML = '<strong style="color:var(--accent-cyan)">Document Content Preview:</strong><br><br>' + result.value;
+              docxBox.style.display = 'block';
+              document.getElementById('metaRows').innerText = result.value.split(/\s+/).length + ' words';
+            });
+        };
+        reader.readAsArrayBuffer(file);
+      } else if (fileExt === 'csv' || fileExt === 'xlsx' || fileExt === 'xls') {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          rawData = XLSX.utils.sheet_to_json(firstSheet, { defval: 0 });
+
+          if (rawData.length === 0) {
+            alert("Uploaded file does not contain any readable data.");
+            return;
+          }
+
+          document.getElementById('metaRows').innerText = rawData.length + ' Customers';
+          showColumnSelectors(Object.keys(rawData[0]));
+          showPreviewTable(rawData.slice(0, 5));
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    }
+
+    function showPreviewTable(rows) {
+      const table = document.getElementById('previewTable');
+      table.innerHTML = '';
+      if (!rows.length) return;
+
+      const headers = Object.keys(rows[0]);
+      let headerHtml = '<thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead>';
+      let bodyHtml = '<tbody>' + rows.map(r => '<tr>' + headers.map(h => {
+        let val = r[h];
+        if (typeof val === 'number' && h.toLowerCase().includes('spend')) {
+          val = '₹' + Number(val).toLocaleString('en-IN');
+        }
+        return `<td>${val}</td>`;
+      }).join('') + '</tr>').join('') + '</tbody>';
+
+      table.innerHTML = headerHtml + bodyHtml;
+      document.getElementById('previewCard').style.display = 'block';
+    }
+
+    function showColumnSelectors(columns) {
+      const spendSel = document.getElementById('spendCol');
+      const freqSel = document.getElementById('freqCol');
+      spendSel.innerHTML = '';
+      freqSel.innerHTML = '';
+
+      columns.forEach(col => {
+        spendSel.innerHTML += `<option value="${col}">${col}</option>`;
+        freqSel.innerHTML += `<option value="${col}">${col}</option>`;
+      });
+
+      // Default smart column detection
+      columns.forEach((col, idx) => {
+        let lower = col.toLowerCase();
+        if (lower.includes('spend') || lower.includes('inr') || lower.includes('amount')) spendSel.selectedIndex = idx;
+        if (lower.includes('freq') || lower.includes('order') || lower.includes('visit')) freqSel.selectedIndex = idx;
+      });
+
+      document.getElementById('colSelectors').style.display = 'flex';
+    }
+
+    function executeSegmentation() {
+      const spendCol = document.getElementById('spendCol').value;
+      const freqCol = document.getElementById('freqCol').value;
+
+      const dataset = rawData.map(r => ({
+        spend: parseFloat(r[spendCol]) || 0,
+        freq: parseFloat(r[freqCol]) || 0
+      })).filter(d => !isNaN(d.spend) && !isNaN(d.freq));
+
+      if (dataset.length < 5) {
+        alert("Please ensure valid numeric columns are selected.");
+        return;
+      }
+
+      // K-Means implementation
+      function kMeans(data, k, maxIter = 15) {
+        let centroids = [];
+        for (let i = 0; i < k; i++) centroids.push({ ...data[Math.floor(Math.random() * data.length)] });
+
+        let assignments = new Array(data.length).fill(0);
+        for (let it = 0; it < maxIter; it++) {
+          for (let i = 0; i < data.length; i++) {
+            let minD = Infinity, bestC = 0;
+            for (let c = 0; c < k; c++) {
+              let d = Math.hypot(data[i].spend - centroids[c].spend, (data[i].freq - centroids[c].freq) * 2000);
+              if (d < minD) { minD = d; bestC = c; }
+            }
+            assignments[i] = bestC;
+          }
+          let sums = Array.from({ length: k }, () => ({ spend: 0, freq: 0, count: 0 }));
+          for (let i = 0; i < data.length; i++) {
+            let c = assignments[i];
+            sums[c].spend += data[i].spend;
+            sums[c].freq += data[i].freq;
+            sums[c].count++;
+          }
+          for (let c = 0; c < k; c++) {
+            if (sums[c].count > 0) {
+              centroids[c] = { spend: sums[c].spend / sums[c].count, freq: sums[c].freq / sums[c].count };
+            }
+          }
+        }
+        let wcss = 0;
+        for (let i = 0; i < data.length; i++) {
+          let c = assignments[i];
+          wcss += Math.pow(data[i].spend - centroids[c].spend, 2) + Math.pow((data[i].freq - centroids[c].freq) * 2000, 2);
+        }
+        return { centroids, assignments, wcss };
+      }
+
+      // 1. Calculate Elbow WCSS for K=1 to 7
+      let wcssValues = [];
+      for (let k = 1; k <= 7; k++) {
+        wcssValues.push(Math.round(kMeans(dataset, k).wcss / 100000000));
+      }
+
+      // Render Elbow Chart
+      document.getElementById('chartsArea').style.display = 'grid';
+      if (elbowChartInstance) elbowChartInstance.destroy();
+      const ctxElbow = document.getElementById('elbowChart').getContext('2d');
+      elbowChartInstance = new Chart(ctxElbow, {
+        type: 'line',
+        data: {
+          labels: ['K=1', 'K=2', 'K=3 (Elbow)', 'K=4', 'K=5', 'K=6', 'K=7'],
+          datasets: [{
+            label: 'Inertia (WCSS)',
+            data: wcssValues,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            pointRadius: [5, 6, 9, 5, 5, 5, 5],
+            pointBackgroundColor: ['#38bdf8', '#38bdf8', '#f43f5e', '#38bdf8', '#38bdf8', '#38bdf8', '#38bdf8'],
+            tension: 0.25,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#cbd5e1' } },
+            tooltip: { callbacks: { label: (ctx) => `WCSS: ${ctx.parsed.y} units` } }
+          },
+          scales: {
+            x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255, 255, 255, 0.06)' } },
+            y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255, 255, 255, 0.06)' } }
+          }
+        }
+      });
+
+      // 2. Render K=3 Clusters
+      const res3 = kMeans(dataset, 3);
+      const clusterColors = ['#38bdf8', '#10b981', '#f59e0b'];
+      const datasets = [];
+
+      // Sort centroids by spend to make cluster labelling consistent
+      const sortedIndices = [0, 1, 2].sort((a, b) => res3.centroids[a].spend - res3.centroids[b].spend);
+
+      sortedIndices.forEach((cIdx, rank) => {
+        const clusterPts = [];
+        for (let i = 0; i < dataset.length; i++) {
+          if (res3.assignments[i] === cIdx) {
+            clusterPts.push({ x: dataset[i].freq, y: dataset[i].spend });
+          }
+        }
+        let labelName = rank === 0 ? "Budget Shoppers" : rank === 1 ? "Regular Customers" : "VIP High-Spenders";
+        datasets.push({
+          label: labelName,
+          data: clusterPts,
+          backgroundColor: clusterColors[rank],
+          pointRadius: 5
+        });
+      });
+
+      if (scatterChartInstance) scatterChartInstance.destroy();
+      const ctxScatter = document.getElementById('scatterChart').getContext('2d');
+      scatterChartInstance = new Chart(ctxScatter, {
+        type: 'scatter',
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#cbd5e1' } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `Visits: ${ctx.parsed.x} | Spend: ₹${Number(ctx.parsed.y).toLocaleString('en-IN')}`
+              }
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: 'Purchase Frequency (Orders/Year)', color: '#94a3b8' }, ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255, 255, 255, 0.06)' } },
+            y: {
+              title: { display: true, text: 'Annual Spending (₹ INR)', color: '#94a3b8' },
+              ticks: {
+                color: '#94a3b8',
+                callback: (val) => '₹' + Number(val).toLocaleString('en-IN')
+              },
+              grid: { color: 'rgba(255, 255, 255, 0.06)' }
+            }
+          }
+        }
+      });
+
+      // 3. Render Persona Insights Cards
+      const personasArea = document.getElementById('personasArea');
+      personasArea.innerHTML = '';
+      sortedIndices.forEach((cIdx, rank) => {
+        let centroid = res3.centroids[cIdx];
+        let title = rank === 0 ? "Budget Shoppers" : rank === 1 ? "Regular Customers" : "VIP High-Spenders";
+        let badgeBg = rank === 0 ? "rgba(56, 189, 248, 0.2)" : rank === 1 ? "rgba(16, 185, 129, 0.2)" : "rgba(245, 158, 11, 0.2)";
+        let badgeColor = clusterColors[rank];
+        let action = rank === 0 ? "Send discount coupons on seasonal festivals." : rank === 1 ? "Offer loyalty points & weekly cashback perks." : "Assign dedicated relationship managers & early product access.";
+
+        personasArea.innerHTML += `
+          <div class="glass-card persona-card" style="border-left-color: ${clusterColors[rank]}">
+            <span class="persona-badge" style="background: ${badgeBg}; color: ${badgeColor};">Cluster ${rank + 1}</span>
+            <h4 style="color: ${clusterColors[rank]}">${title}</h4>
+            <p><strong>Average Spend:</strong> ₹${Math.round(centroid.spend).toLocaleString('en-IN')}</p>
+            <p><strong>Average Visits:</strong> ${Math.round(centroid.freq)} orders/yr</p>
+            <p style="margin-top: 8px; color: var(--text-muted); font-size: 12px;"><strong>Strategy:</strong> ${action}</p>
+          </div>
+        `;
+      });
+      personasArea.style.display = 'grid';
+    }
+  </script>
+</body>
+</html>
